@@ -12,8 +12,29 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-let nextUserId = 1;
+const reservedAccounts = [
+  "Administrator",
+  "Anecdote",
+  "Book-keeper",
+  "arsen477",
+  "vic1",
+  "Administrators bot",
+  "Notifier",
+  "Bot",
+  "livechat",
+  "Jhon doe"
+];
+
 const users = {};
+reservedAccounts.forEach(function(name, index) {
+  users[name] = {
+    id: index + 1,
+    nickname: name,
+    reserved: true
+  };
+});
+
+let nextUserId = 11;
 
 let nextRoomId = 1;
 const rooms = {};
@@ -28,11 +49,11 @@ const chatRooms = {
   "Arab Room": []
 };
 
-app.get('/', (req, res) => {
+app.get('/', function(req, res) {
   res.send('Verve Live Server is running.');
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', function(req, res) {
   const nickname = req.body.nickname;
 
   if (!users[nickname]) {
@@ -40,14 +61,14 @@ app.post('/login', (req, res) => {
       id: nextUserId,
       nickname: nickname
     };
-    nextUserId++;
+    nextUserId = nextUserId + 1;
   }
 
   console.log(nickname + ' logged in with ID ' + users[nickname].id);
   res.json({ success: true, id: users[nickname].id });
 });
 
-app.get('/messages', (req, res) => {
+app.get('/messages', function(req, res) {
   const roomName = req.query.room;
   if (!chatRooms[roomName]) {
     chatRooms[roomName] = [];
@@ -55,7 +76,7 @@ app.get('/messages', (req, res) => {
   res.json(chatRooms[roomName]);
 });
 
-app.post('/send', (req, res) => {
+app.post('/send', function(req, res) {
   const roomName = req.body.roomName;
   const nickname = req.body.nickname;
   const text = req.body.text;
@@ -77,7 +98,7 @@ app.post('/send', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/rooms/create', (req, res) => {
+app.post('/rooms/create', function(req, res) {
   const roomName = req.body.roomName;
   const owner = req.body.owner;
 
@@ -91,32 +112,36 @@ app.post('/rooms/create', (req, res) => {
   };
 
   rooms[nextRoomId] = newRoom;
-  nextRoomId++;
+  nextRoomId = nextRoomId + 1;
 
   console.log('Room created: #' + newRoom.id + ' ' + roomName + ' by ' + owner);
   res.json({ success: true, room: newRoom });
 });
 
-app.get('/rooms/list', (req, res) => {
+app.get('/rooms/list', function(req, res) {
   const allRooms = Object.values(rooms);
   res.json(allRooms);
 });
 
-app.get('/rooms/top', (req, res) => {
+app.get('/rooms/top', function(req, res) {
   const allRooms = Object.values(rooms);
-  const sorted = allRooms.sort((a, b) => b.rating - a.rating);
+  const sorted = allRooms.sort(function(a, b) {
+    return b.rating - a.rating;
+  });
   const top10 = sorted.slice(0, 10);
   res.json(top10);
 });
 
-app.get('/rooms/owned', (req, res) => {
+app.get('/rooms/owned', function(req, res) {
   const nickname = req.query.nickname;
   const allRooms = Object.values(rooms);
-  const owned = allRooms.filter(r => r.owner === nickname);
+  const owned = allRooms.filter(function(r) {
+    return r.owner === nickname;
+  });
   res.json(owned);
 });
 
-app.post('/admin/message', (req, res) => {
+app.post('/admin/message', function(req, res) {
   const nickname = req.body.nickname;
   const message = req.body.message;
 
@@ -130,6 +155,6 @@ app.post('/admin/message', (req, res) => {
   res.json({ success: true });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, function() {
   console.log('Verve Live Server running on port ' + PORT);
 });
