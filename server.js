@@ -43,6 +43,7 @@ function getDefaultData() {
     nextRoomId: 1,
     rooms: {},
     adminMessages: [],
+    contacts: {},
     chatRooms: {
       "General Chat": [],
       "Music Room": [],
@@ -60,6 +61,9 @@ function loadData() {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
       data = JSON.parse(raw);
+      if (!data.contacts) {
+        data.contacts = {};
+      }
       console.log('Data loaded from file.');
     } else {
       console.log('No existing data file, starting fresh.');
@@ -187,6 +191,32 @@ app.post('/admin/message', function(req, res) {
   saveData();
   console.log('Message to admin from ' + nickname + ': ' + message);
   res.json({ success: true });
+});
+
+app.post('/contacts/add', function(req, res) {
+  const owner = req.body.owner;
+  const contactNick = req.body.contactNick;
+
+  if (!data.contacts[owner]) {
+    data.contacts[owner] = [];
+  }
+
+  if (data.contacts[owner].indexOf(contactNick) === -1) {
+    data.contacts[owner].push(contactNick);
+    saveData();
+  }
+
+  res.json({ success: true });
+});
+
+app.get('/contacts/list', function(req, res) {
+  const owner = req.query.owner;
+
+  if (!data.contacts[owner]) {
+    data.contacts[owner] = [];
+  }
+
+  res.json(data.contacts[owner]);
 });
 
 app.listen(PORT, function() {
