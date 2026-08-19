@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -11,6 +12,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const DATA_FILE = './data.json';
 
 const reservedAccounts = [
   "Administrator",
@@ -25,29 +27,57 @@ const reservedAccounts = [
   "Jhon doe"
 ];
 
-const users = {};
-reservedAccounts.forEach(function(name, index) {
-  users[name] = {
-    id: index + 1,
-    nickname: name,
-    reserved: true
+function getDefaultData() {
+  const users = {};
+  reservedAccounts.forEach(function(name, index) {
+    users[name] = {
+      id: index + 1,
+      nickname: name,
+      reserved: true
+    };
+  });
+
+  return {
+    nextUserId: 11,
+    users: users,
+    nextRoomId: 1,
+    rooms: {},
+    adminMessages: [],
+    chatRooms: {
+      "General Chat": [],
+      "Music Room": [],
+      "Fun Room": [],
+      "Games Room": [],
+      "Arab Room": []
+    }
   };
-});
+}
 
-let nextUserId = 11;
+let data = getDefaultData();
 
-let nextRoomId = 1;
-const rooms = {};
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+      data = JSON.parse(raw);
+      console.log('Data loaded from file.');
+    } else {
+      console.log('No existing data file, starting fresh.');
+    }
+  } catch (e) {
+    console.log('Error loading data: ' + e.message);
+  }
+}
 
-const adminMessages = [];
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data));
+  } catch (e) {
+    console.log('Error saving data: ' + e.message);
+  }
+}
 
-const chatRooms = {
-  "General Chat": [],
-  "Music Room": [],
-  "Fun Room": [],
-  "Games Room": [],
-  "Arab Room": []
-};
+loadData();
 
 app.get('/', function(req, res) {
   res.send('Verve Live Server is running.');
@@ -56,24 +86,25 @@ app.get('/', function(req, res) {
 app.post('/login', function(req, res) {
   const nickname = req.body.nickname;
 
-  if (!users[nickname]) {
-    users[nickname] = {
-      id: nextUserId,
+  if (!data.users[nickname]) {
+    data.users[nickname] = {
+      id: data.nextUserId,
       nickname: nickname
     };
-    nextUserId = nextUserId + 1;
+    data.nextUserId = data.nextUserId + 1;
+    saveData();
   }
 
-  console.log(nickname + ' logged in with ID ' + users[nickname].id);
-  res.json({ success: true, id: users[nickname].id });
+  console.log(nickname + ' logged in with ID ' + data.users[nickname].id);
+  res.json({ success: true, id: data.users[nickname].id });
 });
 
 app.get('/messages', function(req, res) {
   const roomName = req.query.room;
-  if (!chatRooms[roomName]) {
-    chatRooms[roomName] = [];
+  if (!data.chatRooms[roomName]) {
+    data.chatRooms[roomName] = [];
   }
-  res.json(chatRooms[roomName]);
+  res.json(data.chatRooms[roomName]);
 });
 
 app.post('/send', function(req, res) {
@@ -81,20 +112,21 @@ app.post('/send', function(req, res) {
   const nickname = req.body.nickname;
   const text = req.body.text;
 
-  if (!chatRooms[roomName]) {
-    chatRooms[roomName] = [];
+  if (!data.chatRooms[roomName]) {
+    data.chatRooms[roomName] = [];
   }
 
-  chatRooms[roomName].push({
+  data.chatRooms[roomName].push({
     nickname: nickname,
     text: text,
     timestamp: Date.now()
   });
 
-  if (chatRooms[roomName].length > 100) {
-    chatRooms[roomName] = chatRooms[roomName].slice(-100);
+  if (data.chatRooms[roomName].length > 100) {
+    data.chatRooms[roomName] = data.chatRooms[roomName].slice(-100);
   }
 
+  saveData();
   res.json({ success: true });
 });
 
@@ -103,7 +135,7 @@ app.post('/rooms/create', function(req, res) {
   const owner = req.body.owner;
 
   const newRoom = {
-    id: nextRoomId,
+    id: data.nextRoomId,
     name: roomName,
     owner: owner,
     founder: owner,
@@ -111,20 +143,21 @@ app.post('/rooms/create', function(req, res) {
     createdAt: Date.now()
   };
 
-  rooms[nextRoomId] = newRoom;
-  nextRoomId = nextRoomId + 1;
+  data.rooms[data.nextRoomId] = newRoom;
+  data.nextRoomId = data.nextRoomId + 1;
+  saveData();
 
   console.log('Room created: #' + newRoom.id + ' ' + roomName + ' by ' + owner);
   res.json({ success: true, room: newRoom });
 });
 
 app.get('/rooms/list', function(req, res) {
-  const allRooms = Object.values(rooms);
+  const allRooms = Object.values(data.rooms);
   res.json(allRooms);
 });
 
 app.get('/rooms/top', function(req, res) {
-  const allRooms = Object.values(rooms);
+  const allRooms = Object.values(data.rooms);
   const sorted = allRooms.sort(function(a, b) {
     return b.rating - a.rating;
   });
@@ -134,7 +167,7 @@ app.get('/rooms/top', function(req, res) {
 
 app.get('/rooms/owned', function(req, res) {
   const nickname = req.query.nickname;
-  const allRooms = Object.values(rooms);
+  const allRooms = Object.values(data.rooms);
   const owned = allRooms.filter(function(r) {
     return r.owner === nickname;
   });
@@ -145,12 +178,13 @@ app.post('/admin/message', function(req, res) {
   const nickname = req.body.nickname;
   const message = req.body.message;
 
-  adminMessages.push({
+  data.adminMessages.push({
     nickname: nickname,
     message: message,
     timestamp: Date.now()
   });
 
+  saveData();
   console.log('Message to admin from ' + nickname + ': ' + message);
   res.json({ success: true });
 });
